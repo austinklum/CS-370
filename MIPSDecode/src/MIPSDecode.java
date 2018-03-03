@@ -56,6 +56,7 @@ public class MIPSDecode {
 					return Type.i;
 			}
 		}
+
 	}
 	
 	private static class Stats {
@@ -65,6 +66,18 @@ public class MIPSDecode {
 			 insts = rType = iType = jType = fwdTaken = bkwTaken = notTaken = loads = stores = 0;
 			 reg = new int[32][2];
 		}
+		
+		private void addToType(Type type) {
+			switch(type) {
+				case r:
+					rType++;
+				case i:
+					iType++;
+				case j:
+					jType++;
+			}
+		}
+		
 		@Override
 		public String toString() {
 			String str =
@@ -84,6 +97,76 @@ public class MIPSDecode {
 			}
 			
 			return str;
+		}
+		
+		private void addToLoadStores(int op) {
+			switch(op) {
+				case 0x24: // lbu
+				case 0x25: // lhu
+				case 0x30: // ll
+				case 0x23: // lw
+					loads++;
+					break;
+				case 0x28: // sb
+				case 0x38: // sc
+				case 0x29: // sh
+				case 0x2b: // sw
+					stores++;
+					break;
+			}
+		}
+		private void addReadWrite(Instruction in) {
+			if(in.type == Type.r) {
+				reg[in.rd][1]++;
+				reg[in.rs][0]++;
+				reg[in.rt][0]++;
+				
+				switch(in.funct) {
+					case 0x08: // jr
+						reg[in.rd][1]--;
+						reg[in.rt][0]--;
+						break;
+					case 0x00: // sll
+					case 0x02: // srl
+					case 0x3:  // sra
+						reg[in.rs][0]--;
+						break;
+				}
+				
+			} else if (in.type == Type.i) {
+				//stores will mess me up
+				//branches will mess me up
+				//lui will mess me up
+				reg[in.rt][1]++;
+				reg[in.rs][0]++;
+				
+				switch(in.op) {
+					case 0xf: // lui
+						reg[in.rs][0]--;
+						break;
+					case 0x4: // beq
+					case 0x5: // bne
+						reg[in.rt][1]--;
+						reg[in.rt][0]++;
+						break;
+					case 0x28: // sb
+					case 0x38: // sc
+					case 0x29: // sh
+					case 0x2b: // sw
+						reg[in.rs][0]--;
+						reg[in.rs][1]++;
+						
+						reg[in.rt][0]++;
+						reg[in.rt][1]--;
+						break;
+				}	
+			// Handle jal
+			} else if (in.op == 0x3) {
+				reg[in.rt][1]--;
+				reg[in.rs][0]--;
+				
+				reg[31][1]++;
+			}
 		}
 	}
 	
@@ -127,9 +210,39 @@ public class MIPSDecode {
 			
 			System.out.println("bongo is");
 			System.out.println(Integer.toBinaryString(bongo));
-	
+			list.trimToSize();
+			getStats(list);
 		}
 	}
 
+	private static Stats getStats(ArrayList<Instruction> list) {
+		Stats stats = new Stats();
+		Instruction prev = null;
+		for(Instruction in : list) {
+			stats.insts++;
+			stats.addToType(in.type);
+			stats.addToLoadStores(in.op);
+			stats.addReadWrite(in);
+			
+			//Branch stuff
+			if(prev == null) {
+				prev = in; 
+				continue;
+			}
+			int diff = prev.addr + 4 - in.addr;
+			if(diff > 0) {
+				//old addr is bigger than new addr;
+				//Took jump forward
+			} else if (diff < 0) {
+				//old addr is less than new addr;
+				//Took jump back
+			} else {
+				//They are the same. No jump was taken
+			}
+			
+			prev = in;
+		}
+		return stats;
+	}
 
 }
