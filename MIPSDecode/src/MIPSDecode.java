@@ -10,19 +10,20 @@ public class MIPSDecode {
 		i,r,j;
 	}
 	private static class Instruction {
-		int addr, word, op, rs, rt, rd, shamt, funct, imm, jAddr;
+		long addr, word;
+		int op, rs, rt, rd, shamt, funct, imm, jAddr;
 		Type type;
-		private Instruction(int addr, int word) {
+		private Instruction(long addr, long word) {
 			this.addr = addr;
 			this.word = word;
 			
 			op = bitsAt(26,31);
 			type = getTypeFromOp();
 
-			rs = bitsAt(21,25);
-			rt = bitsAt(16,20);
-			rd = bitsAt(11,15);
-			shamt = bitsAt(6,10);
+			rs = bitsAt(21,25) >>> 21;
+			rt = bitsAt(16,20) >>> 16;
+			rd = bitsAt(11,15) >>> 11;
+			shamt = bitsAt(6,10) >>> 6;
 			funct = bitsAt(5,0);
 			imm = bitsAt(0,15);
 			jAddr = bitsAt(0,25);
@@ -42,7 +43,7 @@ public class MIPSDecode {
 			       results |= 1 << i;
 			   }
 			   
-			   return word & results;
+			   return (int)(word & results);
 			}
 		//PRE: assumes op has been set
 		private Type getTypeFromOp() {
@@ -71,10 +72,13 @@ public class MIPSDecode {
 			switch(type) {
 				case r:
 					rType++;
+					break;
 				case i:
 					iType++;
+					break;
 				case j:
 					jType++;
+					break;
 			}
 		}
 		
@@ -184,35 +188,36 @@ public class MIPSDecode {
 		while(scan.hasNextLine()) {
 			String[] str = scan.nextLine().split(" ");
 			
-			list.add(new Instruction(Integer.parseInt(str[0], 16),Integer.parseInt(str[1], 16)));
-			int addr = Integer.parseInt(str[0], 16);
-			int word = Integer.parseInt(str[1], 16);
+			list.add(new Instruction(Long.parseLong(str[0], 16), Long.parseLong(str[1], 16)));
+/*			long addr = Long.parseLong(str[0], 16);
+			long word = Long.parseLong(str[1], 16);
 
 			System.out.println(str[0]);
 			System.out.println(addr);
 			System.out.println();
 			System.out.println(str[1]);
-			System.out.println(Integer.toHexString(word));
+			System.out.println(Long.toHexString(word));
 			
-			int foo = word & 0xFC000000; // op mask
-			int bar = word & 0x3E000000; // rs mask
-			int baz = word & 0x1F0000;   // rt mask
-			int bongo = word & 0xF800;	 // rd mask
+			long foo = word & 0xFC000000; // op mask
+			long bar = word & 0x3E000000; // rs mask
+			long baz = word & 0x1F0000;   // rt mask
+			long bongo = word & 0xF800;	 // rd mask
 			
 			System.out.println("Foo is");
-			System.out.println(Integer.toBinaryString(foo));
+			System.out.println(Long.toBinaryString(foo));
 	
 			System.out.println("bar is");
-			System.out.println(Integer.toBinaryString(bar));
+			System.out.println(Long.toBinaryString(bar));
 			
 			System.out.println("baz is");
-			System.out.println(Integer.toBinaryString(baz));
+			System.out.println(Long.toBinaryString(baz));
 			
 			System.out.println("bongo is");
-			System.out.println(Integer.toBinaryString(bongo));
-			list.trimToSize();
-			getStats(list);
+			System.out.println(Long.toBinaryString(bongo));*/
+			
+			
 		}
+		getStats(list);
 	}
 
 	private static Stats getStats(ArrayList<Instruction> list) {
@@ -222,6 +227,7 @@ public class MIPSDecode {
 			stats.insts++;
 			stats.addToType(in.type);
 			stats.addToLoadStores(in.op);
+			System.out.println(stats);
 			stats.addReadWrite(in);
 			
 			//Branch stuff
@@ -229,15 +235,18 @@ public class MIPSDecode {
 				prev = in; 
 				continue;
 			}
-			int diff = prev.addr + 4 - in.addr;
+			long diff = prev.addr + 4 - in.addr;
 			if(diff > 0) {
 				//old addr is bigger than new addr;
 				//Took jump forward
+				stats.fwdTaken++;
 			} else if (diff < 0) {
 				//old addr is less than new addr;
 				//Took jump back
-			} else {
-				//They are the same. No jump was taken
+				stats.bkwTaken++;
+			} else if (prev.op == 0x4 || prev.op == 0x5 ){
+				//They are the same and had a branch. No jump was taken
+				stats.notTaken++;
 			}
 			
 			prev = in;
