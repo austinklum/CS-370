@@ -20,11 +20,11 @@ public class MIPSDecode {
 			op = bitsAt(26,31);
 			type = getTypeFromOp();
 
-			rs = bitsAt(21,25) >>> 21;
-			rt = bitsAt(16,20) >>> 16;
-			rd = bitsAt(11,15) >>> 11;
-			shamt = bitsAt(6,10) >>> 6;
-			funct = bitsAt(5,0);
+			rs = bitsAt(21,25);
+			rt = bitsAt(16,20);
+			rd = bitsAt(11,15);
+			shamt = bitsAt(6,10);
+			funct = bitsAt(0,5);
 			imm = bitsAt(0,15);
 			jAddr = bitsAt(0,25);
 			
@@ -43,7 +43,7 @@ public class MIPSDecode {
 			       results |= 1 << i;
 			   }
 			   
-			   return (int)(word & results);
+			   return ((int)(word & results)) >>> start;
 			}
 		//PRE: assumes op has been set
 		private Type getTypeFromOp() {
@@ -184,7 +184,6 @@ public class MIPSDecode {
 			System.out.println("File not found!");
 		} 
 		ArrayList<Instruction> list = new ArrayList<>();
-		Instruction in;
 		while(scan.hasNextLine()) {
 			String[] str = scan.nextLine().split(" ");
 			
@@ -214,10 +213,8 @@ public class MIPSDecode {
 			
 			System.out.println("bongo is");
 			System.out.println(Long.toBinaryString(bongo));*/
-			
-			
 		}
-		getStats(list);
+		System.out.println(getStats(list));;
 	}
 
 	private static Stats getStats(ArrayList<Instruction> list) {
@@ -227,7 +224,6 @@ public class MIPSDecode {
 			stats.insts++;
 			stats.addToType(in.type);
 			stats.addToLoadStores(in.op);
-			System.out.println(stats);
 			stats.addReadWrite(in);
 			
 			//Branch stuff
