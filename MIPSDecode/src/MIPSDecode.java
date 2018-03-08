@@ -38,12 +38,12 @@ public class MIPSDecode {
 		 * @return subset of integer in the given range
 		 * */
 		public int bitsAt(int start, int end){
-			   int results = 0;
+			   int bitMask = 0;
 			   for (int i=start; i<=end; i++) {
-			       results |= 1 << i;
+				   bitMask |= 1 << i;
 			   }
 			   
-			   return ((int)(word & results)) >>> start;
+			   return ((int)(word & bitMask)) >>> start;
 			}
 		//PRE: assumes op has been set
 		private Type getTypeFromOp() {
@@ -120,56 +120,77 @@ public class MIPSDecode {
 			}
 		}
 		private void addReadWrite(Instruction in) {
-			if(in.type == Type.r) {
-				reg[in.rd][1]++;
-				reg[in.rs][0]++;
-				reg[in.rt][0]++;
-				
-				switch(in.funct) {
-					case 0x08: // jr
-						reg[in.rd][1]--;
-						reg[in.rt][0]--;
-						break;
-					case 0x00: // sll
-					case 0x02: // srl
-					case 0x3:  // sra
-						reg[in.rs][0]--;
-						break;
-				}
-				
-			} else if (in.type == Type.i) {
-				//stores will mess me up
-				//branches will mess me up
-				//lui will mess me up
-				reg[in.rt][1]++;
-				reg[in.rs][0]++;
-				
-				switch(in.op) {
-					case 0xf: // lui
-						reg[in.rs][0]--;
-						break;
-					case 0x4: // beq
-					case 0x5: // bne
-						reg[in.rt][1]--;
-						reg[in.rt][0]++;
-						break;
-					case 0x28: // sb
-					case 0x38: // sc
-					case 0x29: // sh
-					case 0x2b: // sw
-						reg[in.rs][0]--;
-						reg[in.rs][1]++;
+			int read = 0, write = 1;
+			switch(in.type) {
+				case r:
+					reg[in.rd][write]++;
+					reg[in.rs][read]++;
+					reg[in.rt][read]++;
+					
+					switch(in.funct) {
+						case 0x08: // jr
+							reg[in.rd][write]--;
+							reg[in.rt][read]--;
+							break;
+						case 0x00: // sll
+						case 0x02: // srl
+						case 0x3:  // sra
+							reg[in.rs][read]--;
+							break;
+					}
+					break;
+				case i:
+					//stores will mess me up
+					//branches will mess me up
+					//lui will mess me up
+					reg[in.rt][write]++;
+					reg[in.rs][read]++;
+					
+					switch(in.op) {
+						case 0xf: // lui
+							reg[in.rs][read]--;
+							break;
+						case 0x4: // beq
+						case 0x5: // bne
+							reg[in.rt][write]--;
+							reg[in.rt][read]++;
+							break;
+						case 0x28: // sb
+						case 0x38: // sc
+						case 0x29: // sh
+						case 0x2b: // sw
+							reg[in.rt][read]++;
+							reg[in.rt][write]--;
+							break;
+					}	
+					break;
+				// Handle jal
+				default:
+					if (in.op == 0x3) {
+						reg[in.rt][write]--;
+						reg[in.rs][read]--;
 						
-						reg[in.rt][0]++;
-						reg[in.rt][1]--;
-						break;
-				}	
-			// Handle jal
-			} else if (in.op == 0x3) {
-				reg[in.rt][1]--;
-				reg[in.rs][0]--;
-				
-				reg[31][1]++;
+						reg[31][write]++;
+					}
+				break;
+			}
+		}
+
+		public void addBranchCount(long prevAddr, long inAddr, int prevOp) {
+			long diff = prevAddr + 4 - inAddr;
+			if(diff < 0) {
+				//old addr is less than new addr;
+				//Took jump forward
+				fwdTaken++;
+			} else if (diff > 0) {
+				//old addr is bigger than new addr;
+				//Took jump back
+				bkwTaken++;
+				 
+			// beq OR bne
+			} else if (prevOp == 0x4 || prevOp == 0x5 ){
+				//They are the same and had a branch. No jump was taken
+				notTaken++;
 			}
 		}
 	}
@@ -186,35 +207,9 @@ public class MIPSDecode {
 		ArrayList<Instruction> list = new ArrayList<>();
 		while(scan.hasNextLine()) {
 			String[] str = scan.nextLine().split(" ");
-			
 			list.add(new Instruction(Long.parseLong(str[0], 16), Long.parseLong(str[1], 16)));
-/*			long addr = Long.parseLong(str[0], 16);
-			long word = Long.parseLong(str[1], 16);
-
-			System.out.println(str[0]);
-			System.out.println(addr);
-			System.out.println();
-			System.out.println(str[1]);
-			System.out.println(Long.toHexString(word));
-			
-			long foo = word & 0xFC000000; // op mask
-			long bar = word & 0x3E000000; // rs mask
-			long baz = word & 0x1F0000;   // rt mask
-			long bongo = word & 0xF800;	 // rd mask
-			
-			System.out.println("Foo is");
-			System.out.println(Long.toBinaryString(foo));
-	
-			System.out.println("bar is");
-			System.out.println(Long.toBinaryString(bar));
-			
-			System.out.println("baz is");
-			System.out.println(Long.toBinaryString(baz));
-			
-			System.out.println("bongo is");
-			System.out.println(Long.toBinaryString(bongo));*/
 		}
-		System.out.println(getStats(list));;
+		System.out.println(getStats(list));
 	}
 
 	private static Stats getStats(ArrayList<Instruction> list) {
@@ -225,28 +220,15 @@ public class MIPSDecode {
 			stats.addToType(in.type);
 			stats.addToLoadStores(in.op);
 			stats.addReadWrite(in);
-			
-			//Branch stuff
 			if(prev == null) {
 				prev = in; 
 				continue;
 			}
-			long diff = prev.addr + 4 - in.addr;
-			if(diff > 0) {
-				//old addr is bigger than new addr;
-				//Took jump forward
-				stats.fwdTaken++;
-			} else if (diff < 0) {
-				//old addr is less than new addr;
-				//Took jump back
-				stats.bkwTaken++;
-			} else if (prev.op == 0x4 || prev.op == 0x5 ){
-				//They are the same and had a branch. No jump was taken
-				stats.notTaken++;
-			}
+			stats.addBranchCount(prev.addr,in.addr,prev.op);
 			
 			prev = in;
 		}
+		//stats.addBranchCount(prev.addr, prev.addr, prev.op);
 		return stats;
 	}
 
