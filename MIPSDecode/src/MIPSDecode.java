@@ -95,11 +95,11 @@ public class MIPSDecode {
 					"loads: " + loads + "\n" +
 					"stores: " + stores + "\n";
 			//Loop through all the registers and add them to the string
-			int index = 0;
-			for(int[] r : reg) {
-				str += "reg-" + index++ + ": " + r[0] + " " + r[1] + "\n";
+			int i;
+			for(i = 0; i < reg.length - 1; i++) {
+				str += "reg-" + i + ": " + reg[i][0] + " " + reg[i][1] + "\n";
 			}
-			
+			str += "reg-" + i + ": " + reg[i][0] + " " + reg[i][1];
 			return str;
 		}
 		
@@ -197,7 +197,7 @@ public class MIPSDecode {
 	
 	public static void main(String[] args) {
 		Scanner scan = null;
-		PrintWriter pw;
+		PrintWriter pw = null;
 		try {
 			scan = new Scanner(new File("trace.txt"));
 			pw = new PrintWriter(new FileWriter("statistics.txt"));
@@ -205,11 +205,14 @@ public class MIPSDecode {
 			System.out.println("File not found!");
 		} 
 		ArrayList<Instruction> list = new ArrayList<>();
+		//Read and parse every line in the file
 		while(scan.hasNextLine()) {
 			String[] str = scan.nextLine().split(" ");
 			list.add(new Instruction(Long.parseLong(str[0], 16), Long.parseLong(str[1], 16)));
 		}
-		System.out.println(getStats(list));
+		//Add everything to my stats and print to file
+		pw.print(getStats(list));
+		pw.flush();
 	}
 
 	private static Stats getStats(ArrayList<Instruction> list) {
@@ -228,7 +231,7 @@ public class MIPSDecode {
 			
 			prev = in;
 		}
-		//stats.addBranchCount(prev.addr, prev.addr, prev.op);
+		
 		return stats;
 	}
 
