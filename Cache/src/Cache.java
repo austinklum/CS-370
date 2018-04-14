@@ -39,9 +39,8 @@ public class Cache {
 		boolean valid, dirty;
 		int tag;
 		
-		private CacheBlock(int tag){
-			this.tag = tag;
-			valid = true;
+		private CacheBlock(){
+			valid = false;
 			dirty = false;
 		}
 	}
@@ -50,6 +49,20 @@ public class Cache {
 		int rHits,wHits,rMisses,wMisses,wb,wt;
 		private Stats() {
 			rHits = wHits = rMisses = wMisses = wb = wt = 0;
+		}
+		/**
+		 * Prints out the statistics of the cache 
+		 */
+		@Override
+		public String toString() {
+			double hrate =  ((double)(rHits + wHits) / (double)(rHits + wHits + rMisses + wMisses));
+			return  "rhits: " + rHits + "\n" +
+					"whits: " + wHits + "\n" +
+					"rmisses: " + rMisses + "\n" +
+					"wmisses: " + wMisses + "\n" +
+					"hrate: " + hrate + "\n" +
+					"wb: " + wb + "\n" +
+					"wt: " + wt;
 		}
 	}
 	
@@ -65,8 +78,8 @@ public class Cache {
 		}
 		
 		int cacheType = scan.nextInt();
-		indexNum = scan.nextInt();
 		offsetNum = scan.nextInt();
+		indexNum = scan.nextInt();
 		String allocPol = scan.next();
 		String writePol = scan.next();
 		
@@ -74,10 +87,17 @@ public class Cache {
 		setAllocPolicy(allocPol);
 		setWritePolicy(writePol);
 		
-		sets = 2 << indexNum;
+		sets = 2 << indexNum-1;
 		
 		cache = new CacheBlock[sets][ways];
+		for(int i = 0; i < cache.length; i++) {
+			for (int j = 0; j < cache[i].length; j++) {
+				cache[i][j] = new CacheBlock();
+				//System.out.println("Pause");
+			}
+		}
 		stats = new Stats();
+		useNext = new int[sets];
 	}
 
 	/**
@@ -158,7 +178,7 @@ public class Cache {
 			int index = bitsAt(offsetNum,indexNum,addr);
 			int tag = bitsAt(indexNum,32,addr);
 			
-			//We missed and need to allocate
+			//We missed and need to allocate/replace
 			if(!checkHit(rw, index, tag) && (rw == ReadWrite.READ || allocPolicy == AllocPolicy.WRITE_ALLOCATE)) {
 				allocate(rw,index,tag);
 			}
@@ -277,7 +297,7 @@ public class Cache {
 	 */
 	@Override
 	public String toString() {
-		return null;
+		return stats.toString();
 	}
 	
 	public static void main(String[] args) {
