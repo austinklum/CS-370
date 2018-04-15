@@ -36,12 +36,12 @@ public class Cache {
 	
 	
 	private class CacheBlock {
-		boolean valid, dirty;
+		boolean isValid, isDirty;
 		int tag;
 		
 		private CacheBlock(){
-			valid = false;
-			dirty = false;
+			isValid = false;
+			isDirty = false;
 		}
 	}
 	
@@ -190,14 +190,14 @@ public class Cache {
 		CacheBlock[] block = cache[index];
 		
 		//Easy case: one of the blocks are not valid.
-		if(!block[0].valid) {
-			block[0].valid = true;
+		if(!block[0].isValid) {
+			block[0].isValid = true;
 			block[0].tag = tag;
 			cache[index][0] = block[0];
 			useNext[index] = 1;
 			return;
-		} else if (cacheType == CacheType.SET_ASSOCIATIVE && !block[1].valid) {
-			block[1].valid = true;
+		} else if (cacheType == CacheType.SET_ASSOCIATIVE && !block[1].isValid) {
+			block[1].isValid = true;
 			block[1].tag = tag;
 			cache[index][1] = block[0];
 			useNext[index] = 0;
@@ -206,9 +206,10 @@ public class Cache {
 		
 		if (cacheType == CacheType.DIRECT_MAPPED) {
 			block[0].tag = tag;
-			if (writePolicy == WritePolicy.WRITE_BACK && block[0].dirty) {
+			if (writePolicy == WritePolicy.WRITE_BACK && block[0].isDirty) {
 				stats.wb++;
-				block[0].dirty = rw == ReadWrite.WRITE;
+				// Still dirty if a write, clean when a read.
+				block[0].isDirty = rw == ReadWrite.WRITE;
 			}
 		} else if (cacheType == CacheType.SET_ASSOCIATIVE) {
 			int nextIndex = useNext[index];
@@ -220,9 +221,9 @@ public class Cache {
 				useNext[index] = 0;
 			}
 			
-			if(writePolicy == WritePolicy.WRITE_BACK && block[nextIndex].dirty) {
+			if(writePolicy == WritePolicy.WRITE_BACK && block[nextIndex].isDirty) {
 				stats.wb++;
-				block[nextIndex].dirty = rw == ReadWrite.WRITE;
+				block[nextIndex].isDirty = rw == ReadWrite.WRITE;
 			}
 		}
 		
@@ -270,11 +271,11 @@ public class Cache {
 		CacheBlock[] block = cache[index];
 		
 		//check block for hit
-		if (block[0].valid && block[0].tag == tag) {
+		if (block[0].isValid && block[0].tag == tag) {
 			isHit = true;
 		}
 		//Check the other block for a hit if we miss on block 0 and is set associative.
-		if(!isHit && cacheType == CacheType.SET_ASSOCIATIVE && block[1].valid && block[1].tag == tag) {
+		if(!isHit && cacheType == CacheType.SET_ASSOCIATIVE && block[1].isValid && block[1].tag == tag) {
 			isHit = true;
 		}
 		return isHit;
