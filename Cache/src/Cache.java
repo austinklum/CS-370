@@ -88,7 +88,6 @@ public class Cache {
 		setWritePolicy(writePol);
 		
 		sets = 2 << indexNum-1;
-		
 		cache = new CacheBlock[sets][ways];
 		for(int i = 0; i < cache.length; i++) {
 			for (int j = 0; j < cache[i].length; j++) {
@@ -175,9 +174,8 @@ public class Cache {
 			//Get one line of input at a time
 			ReadWrite rw = setReadWrite(scan.next());
 			long addr = scan.nextLong(16);
-			int index = bitsAt(offsetNum,indexNum,addr);
-			int tag = bitsAt(indexNum,32,addr);
-			
+			int index = bitsAt(offsetNum,offsetNum+indexNum-1,addr);
+			int tag = bitsAt(offsetNum+indexNum,31,addr);
 			//We missed and need to allocate/replace
 			if(!checkHit(rw, index, tag) && (rw == ReadWrite.READ || allocPolicy == AllocPolicy.WRITE_ALLOCATE)) {
 				allocate(rw,index,tag);
@@ -193,13 +191,13 @@ public class Cache {
 		if(!block[0].isValid) {
 			block[0].isValid = true;
 			block[0].tag = tag;
-			cache[index][0] = block[0];
+			//cache[index][0] = block[0];
 			useNext[index] = 1;
 			return;
 		} else if (cacheType == CacheType.SET_ASSOCIATIVE && !block[1].isValid) {
 			block[1].isValid = true;
 			block[1].tag = tag;
-			cache[index][1] = block[0];
+			//cache[index][1] = block[1];
 			useNext[index] = 0;
 			return;
 		}
@@ -211,6 +209,7 @@ public class Cache {
 				// Still dirty if a write, clean when a read.
 				block[0].isDirty = rw == ReadWrite.WRITE;
 			}
+			//cache[index][0] = block[0];
 		} else if (cacheType == CacheType.SET_ASSOCIATIVE) {
 			int nextIndex = useNext[index];
 			block[nextIndex].tag = tag;
@@ -225,6 +224,7 @@ public class Cache {
 				stats.wb++;
 				block[nextIndex].isDirty = rw == ReadWrite.WRITE;
 			}
+			//cache[index][nextIndex] = block[nextIndex];
 		}
 		
 	}
