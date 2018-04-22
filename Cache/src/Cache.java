@@ -1,5 +1,9 @@
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.text.DecimalFormat;
 import java.util.Scanner;
 
 public class Cache {
@@ -60,7 +64,7 @@ public class Cache {
 					"whits: " + wHits + "\n" +
 					"rmisses: " + rMisses + "\n" +
 					"wmisses: " + wMisses + "\n" +
-					"hrate: " + hrate + "\n" +
+					"hrate: " + new DecimalFormat("0.000000").format(hrate) + "\n" +
 					"wb: " + wb + "\n" +
 					"wt: " + wt;
 		}
@@ -97,8 +101,35 @@ public class Cache {
 		}
 		stats = new Stats();
 		useNext = new int[sets];
+//		System.out.println("Sets:" + sets);
+//		System.out.println("OffsetNum: " + (2 << offsetNum-1));
+//		System.out.println("TOTAL BYTES: " + ways * sets * (2 << offsetNum-1));
 	}
-
+	private Cache(int offsetNum,int indexNum,AllocPolicy allocPol,CacheType type,WritePolicy writePol) {
+		this.offsetNum = offsetNum;
+		this.indexNum = indexNum;
+		this.sets = 2 << indexNum-1;
+		this.allocPolicy = allocPol;
+		this.writePolicy = writePol;
+		this.cacheType = type;
+		
+		if(CacheType.DIRECT_MAPPED == type) {
+			ways = 1;
+		} else {
+			ways = 2;
+		}
+		stats = new Stats();
+		useNext = new int[sets];
+		cache = new CacheBlock[sets][ways];
+		for(int i = 0; i < cache.length; i++) {
+			for (int j = 0; j < cache[i].length; j++) {
+				cache[i][j] = new CacheBlock();
+			}
+		}
+		System.out.println("\n\nSets:" + sets + " Offset: " + offsetNum + " IndexNum " + indexNum);
+		System.out.println("OffsetNum: " + (2 << offsetNum-1));
+		System.out.println("TOTAL BYTES: " + ways * sets * (2 << offsetNum-1));
+	}
 	/**
 	 * @param type
 	 */
@@ -174,8 +205,8 @@ public class Cache {
 			//Get one line of input at a time
 			ReadWrite rw = setReadWrite(scan.next());
 			long addr = scan.nextLong(16);
-			int index = bitsAt(offsetNum,offsetNum+indexNum-1,addr);
-			int tag = bitsAt(offsetNum+indexNum,31,addr);
+			int index = bitsAt(offsetNum,offsetNum + indexNum - 1,addr);
+			int tag = bitsAt(offsetNum + indexNum,31,addr);
 			//We missed and need to allocate/replace
 			if(!checkHit(rw, index, tag) && (rw == ReadWrite.READ || allocPolicy == AllocPolicy.WRITE_ALLOCATE)) {
 				allocate(rw,index,tag);
@@ -204,10 +235,14 @@ public class Cache {
 		
 		if (cacheType == CacheType.DIRECT_MAPPED) {
 			block[0].tag = tag;
-			if (writePolicy == WritePolicy.WRITE_BACK && block[0].isDirty) {
-				stats.wb++;
-				// Still dirty if a write, clean when a read.
-				block[0].isDirty = rw == ReadWrite.WRITE;
+			if (writePolicy == WritePolicy.WRITE_BACK) {
+				if(block[0].isDirty) {
+					stats.wb++;
+					// Still dirty if a write, clean when a read.
+					block[0].isDirty = rw == ReadWrite.WRITE;
+				} else if (!block[0].isDirty) {
+					block[0].isDirty = true;
+				}
 			}
 			//cache[index][0] = block[0];
 		} else if (cacheType == CacheType.SET_ASSOCIATIVE) {
@@ -220,9 +255,14 @@ public class Cache {
 				useNext[index] = 0;
 			}
 			
-			if(writePolicy == WritePolicy.WRITE_BACK && block[nextIndex].isDirty) {
-				stats.wb++;
-				block[nextIndex].isDirty = rw == ReadWrite.WRITE;
+			if (writePolicy == WritePolicy.WRITE_BACK) {
+				if(block[nextIndex].isDirty) {
+					stats.wb++;
+					// Still dirty if a write, clean when a read.
+					block[nextIndex].isDirty = rw == ReadWrite.WRITE;
+				} else if (!block[nextIndex].isDirty) {
+					block[nextIndex].isDirty = true;
+				}
 			}
 			//cache[index][nextIndex] = block[nextIndex];
 		}
@@ -305,6 +345,36 @@ public class Cache {
 		Cache cache = new Cache();
 		cache.processAccesses();
 		System.out.println(cache);
+		try {
+			PrintWriter pw = new PrintWriter(new FileWriter("statistics.txt"));
+			pw.print(cache);
+			pw.flush();
+		} catch (IOException e) {
+			System.out.println("IOException");
+		}
+		//findBestCache();
 	}
-
+	//65,536 bytes OR half that at 32,768
+	private static void findBestCache() {
+		Cache[] cache = new Cache[16];
+		int j = 14;
+		for(int i = 1; i <= 15; i++){
+				cache[i] = new Cache(j--,i,AllocPolicy.WRITE_NO_ALLOCATE,CacheType.SET_ASSOCIATIVE,WritePolicy.WRITE_THROUGH);
+				cache[i].processAccesses();
+				System.out.println("Cache: " + i + " . " + j + "\n" + cache[i].allocPolicy + " : "
+				+ cache[i].cacheType + " : " + cache[i].sets + " : " 
+				+ cache[i].ways + "\nSTATS:\n" + cache[i]);
+			}
+		}
+		int count = 0;
+//		for(int i = 0; i <= 65536; i++) {
+//			for(int j = 0; j <= 65536;j++) {
+//				if((i*j) == 65536) {
+//					count++;
+//					System.out.println("Count: "+ count + " I: " + i + " J: " + j);
+//				}
+//				
+//			}
+//		}
+	//}
 }
