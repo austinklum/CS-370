@@ -278,7 +278,7 @@ public class Cache {
 	 * @return 
 	 */
 	private boolean checkHit(ReadWrite rw, int index, int tag) {
-		boolean isHit = isHit(index,tag);
+		boolean isHit = isHit(index,tag,rw);
 		if(isHit) {
 			//Hit on read or write
 			if(rw == ReadWrite.READ) {
@@ -305,7 +305,7 @@ public class Cache {
 		return isHit;
 	}
 	
-	private boolean isHit(int index, int tag) {
+	private boolean isHit(int index, int tag, ReadWrite rw) {
 		boolean isHit = false;
 		//Index into cacheblock
 		CacheBlock[] block = cache[index];
@@ -313,10 +313,16 @@ public class Cache {
 		//check block for hit
 		if (block[0].isValid && block[0].tag == tag) {
 			isHit = true;
+			if(writePolicy == WritePolicy.WRITE_BACK && rw == ReadWrite.WRITE) {
+				cache[index][0].isDirty = true;
+			}
 		}
 		//Check the other block for a hit if we miss on block 0 and is set associative.
 		if(!isHit && cacheType == CacheType.SET_ASSOCIATIVE && block[1].isValid && block[1].tag == tag) {
 			isHit = true;
+			if(writePolicy == WritePolicy.WRITE_BACK && rw == ReadWrite.WRITE) {
+				cache[index][1].isDirty = true;
+			}
 		}
 		return isHit;
 	}
